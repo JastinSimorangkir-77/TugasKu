@@ -143,12 +143,22 @@ final taskListProvider = StateNotifierProvider<TaskNotifier, List<TaskModel>>((r
 // Smart Sorted & Filtered Tasks Provider
 final filteredSortedTasksProvider = Provider<List<TaskModel>>((ref) {
   final tasks = ref.watch(taskListProvider);
-  final selectedFilter = ref.watch(selectedSubjectProvider);
+  final selectedCategory = ref.watch(selectedCategoryProvider);
+  final selectedSubject = ref.watch(selectedSubjectProvider);
 
-  // 1. Filter by subject
-  final subjectFiltered = selectedFilter == 'Semua'
-      ? tasks
-      : tasks.where((t) => t.subject == selectedFilter).toList();
+  // 1. Filter by category then by specific subject
+  List<TaskModel> filtered = tasks;
+
+  if (selectedCategory != 'Semua') {
+    filtered = filtered.where((t) => t.category == selectedCategory).toList();
+  }
+
+  if (selectedSubject != null) {
+    filtered = filtered.where((t) => t.subject == selectedSubject).toList();
+  }
+
+  // alias for readability
+  final subjectFiltered = filtered;
 
   // 2. Separate pending and completed tasks
   final pending = subjectFiltered.where((t) => !t.isCompleted).toList();
@@ -246,4 +256,22 @@ final weeklyProductivityProvider = Provider<List<DayProductivity>>((ref) {
   }
 
   return daysList;
+});
+
+// ─── Reactive Badge Count Providers ─────────────────────────────────────────
+
+/// Jumlah tugas pending di kategori Produktif Kejuruan
+final produktifPendingCountProvider = Provider<int>((ref) {
+  final tasks = ref.watch(taskListProvider);
+  return tasks
+      .where((t) => !t.isCompleted && t.category == 'Produktif Kejuruan')
+      .length;
+});
+
+/// Jumlah tugas pending di kategori Mata Pelajaran Umum
+final umumPendingCountProvider = Provider<int>((ref) {
+  final tasks = ref.watch(taskListProvider);
+  return tasks
+      .where((t) => !t.isCompleted && t.category == 'Mata Pelajaran Umum')
+      .length;
 });

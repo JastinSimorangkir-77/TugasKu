@@ -11,10 +11,12 @@ class NotificationService {
 
   static bool _isInitialized = false;
 
-  static const String _urgentChannelId = 'tugasku_urgent_channel';
-  static const String _urgentChannelName = 'Peringatan Mendesak (H-2 Jam)';
-  static const String _dailyChannelId = 'tugasku_daily_channel';
-  static const String _dailyChannelName = 'Pengingat Harian Rutin (24 Jam Sekali)';
+  static const String _urgentChannelId = 'tugasku_popup_urgent_v3';
+  static const String _urgentChannelName = 'Peringatan Mendesak Pop-up (H-2 Jam)';
+  static const String _dailyChannelId = 'tugasku_popup_daily_v3';
+  static const String _dailyChannelName = 'Pengingat Harian Rutin Pop-up (24 Jam Sekali)';
+  static const String _testChannelId = 'tugasku_popup_test_channel_v3';
+  static const String _testChannelName = 'Pop-Up Alarm Notifikasi TugasKu';
 
   static Future<void> init() async {
     if (_isInitialized) return;
@@ -80,9 +82,55 @@ class NotificationService {
     }
   }
 
-  /// Jadwal otomatis pintar berbasis preferensi Pengaturan (Settings):
+  /// Menampilkan notifikasi pop-up (Heads-up) instan dengan suara dan getaran
+  /// untuk menguji langsung di layar HP Android/iOS pengguna.
+  static Future<void> showHeadsUpTestNotification() async {
+    try {
+      await requestPermissions();
+      final settings = StorageService.loadSettings();
+
+      final androidDetails = AndroidNotificationDetails(
+        _testChannelId,
+        _testChannelName,
+        channelDescription:
+            'Pop-up darurat dan suara alarm untuk pengingat tugas sekolah SMK.',
+        importance: Importance.max,
+        priority: Priority.max,
+        playSound: settings.enableSound,
+        enableVibration: settings.enableVibration,
+        showWhen: true,
+        category: AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      final iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: settings.enableSound,
+      );
+
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notificationsPlugin.show(
+        88888,
+        '🔔 Pop-up TugasKu: Berhasil Berbunyi!',
+        'Notifikasi pop-up dan suara alarm aktif! Peringatan tugas sekolahmu akan berbunyi tepat waktu.',
+        notificationDetails,
+        payload: 'test_heads_up',
+      );
+      debugPrint('Pop-up test notification delivered with sound.');
+    } catch (e) {
+      debugPrint('Error showing heads-up test notification: $e');
+    }
+  }
+
+  /// Jadwal otomatis pintar:
   /// 1. Jika tenggat masih lama (> 24 jam) dan pengingat harian aktif, jadwalkan pengingat setiap 24 jam sekali.
-  /// 2. Jika tenggat sudah dekat dan peringatan darurat aktif, buat notifikasi peringatan di H-2 jam sebelum tenggat.
+  /// 2. Jika tenggat sudah dekat dan peringatan darurat aktif, buat notifikasi pop-up di H-2 jam sebelum tenggat.
   static Future<void> scheduleTaskNotifications(TaskModel task) async {
     if (task.isCompleted) {
       await cancelTaskNotifications(task);
@@ -102,7 +150,7 @@ class NotificationService {
     final time2hBefore = task.deadline.subtract(const Duration(hours: 2));
 
     // -------------------------------------------------------------------------
-    // 1. Peringatan Mendesak di H-2 Jam Sebelum Tenggat Pengumpulan
+    // 1. Peringatan Mendesak Pop-up di H-2 Jam Sebelum Tenggat Pengumpulan
     // -------------------------------------------------------------------------
     if (settings.enableUrgentReminder && time2hBefore.isAfter(now)) {
       await _scheduleSingleNotification(
@@ -167,13 +215,17 @@ class NotificationService {
         isUrgent ? _urgentChannelId : _dailyChannelId,
         isUrgent ? _urgentChannelName : _dailyChannelName,
         channelDescription: isUrgent
-            ? 'Notifikasi peringatan darurat tepat 2 jam sebelum batas waktu tugas.'
-            : 'Notifikasi pengingat berkala setiap 24 jam sekali untuk tugas dengan tenggat lama.',
-        importance: isUrgent ? Importance.max : Importance.high,
-        priority: isUrgent ? Priority.max : Priority.high,
+            ? 'Pop-up darurat dan suara alarm tepat 2 jam sebelum batas akhir pengumpulan tugas.'
+            : 'Pop-up berkala setiap 24 jam sekali untuk tugas sekolah dengan tenggat lama.',
+        importance: Importance.max,
+        priority: Priority.max,
         showWhen: true,
         playSound: enableSound,
         enableVibration: enableVibration,
+        category: isUrgent
+            ? AndroidNotificationCategory.alarm
+            : AndroidNotificationCategory.reminder,
+        visibility: NotificationVisibility.public,
         icon: '@mipmap/ic_launcher',
       );
 
@@ -200,7 +252,7 @@ class NotificationService {
         payload: payload,
       );
       debugPrint(
-        'Notification scheduled (${isUrgent ? 'URGENT H-2h' : 'DAILY 24h'}, Sound: $enableSound, Vib: $enableVibration) for $tzScheduled (ID: $id)',
+        'Notification scheduled (${isUrgent ? 'URGENT POP-UP H-2h' : 'DAILY POP-UP 24h'}, Sound: $enableSound) for $tzScheduled (ID: $id)',
       );
     } catch (e) {
       debugPrint('Error scheduling notification: $e');

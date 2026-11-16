@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/activity_model.dart';
 import '../models/settings_model.dart';
+import '../models/subject_model.dart';
 import '../models/task_model.dart';
 
 class StorageService {
@@ -13,6 +14,7 @@ class StorageService {
   static const String _lastActivityKey = 'last_user_activity';
   static const String _lastSessionKey = 'last_session_time';
   static const String _settingsKey = 'app_user_settings';
+  static const String _subjectsKey = 'subjects_data';
 
   static Box? _box;
   static SharedPreferences? _prefs;
@@ -168,5 +170,37 @@ class StorageService {
       await _box!.clear();
     }
     await _prefs?.clear();
+  }
+
+  // --- Subject Storage ---
+  static Future<void> saveSubjects(List<SubjectModel> subjects) async {
+    final listJson = subjects.map((s) => s.toMap()).toList();
+    final encoded = jsonEncode(listJson);
+    if (_box != null && _box!.isOpen) {
+      await _box!.put(_subjectsKey, encoded);
+    }
+    await _prefs?.setString(_subjectsKey, encoded);
+  }
+
+  static List<SubjectModel> loadSubjects() {
+    String? rawData;
+    if (_box != null && _box!.isOpen) {
+      rawData = _box!.get(_subjectsKey) as String?;
+    }
+    rawData ??= _prefs?.getString(_subjectsKey);
+
+    if (rawData != null && rawData.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawData) as List<dynamic>;
+        return decoded
+            .map((item) => SubjectModel.fromMap(Map<String, dynamic>.from(item as Map)))
+            .toList();
+      } catch (e) {
+        debugPrint('Error decoding subjects: $e');
+      }
+    }
+
+    // Return defaults on first launch
+    return SubjectModel.defaultSubjects;
   }
 }

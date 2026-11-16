@@ -70,6 +70,12 @@ class SettingsNotifier extends StateNotifier<AppSettingsModel> {
     state = updated;
     StorageService.saveSettings(updated);
   }
+
+  void setAvatarIndex(int index) {
+    final updated = state.copyWith(avatarIndex: index);
+    state = updated;
+    StorageService.saveSettings(updated);
+  }
 }
 
 final settingsProvider =

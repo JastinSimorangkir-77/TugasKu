@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
+import 'subject_model.dart';
 
 enum TaskPriority {
   urgent('Mendesak', 3, AppColors.priorityUrgent),
@@ -14,64 +15,41 @@ enum TaskPriority {
 
   static TaskPriority fromString(String value) {
     return TaskPriority.values.firstWhere(
-      (p) => p.name.toLowerCase() == value.toLowerCase() || p.label.toLowerCase() == value.toLowerCase(),
+      (p) =>
+          p.name.toLowerCase() == value.toLowerCase() ||
+          p.label.toLowerCase() == value.toLowerCase(),
       orElse: () => TaskPriority.medium,
     );
   }
 }
 
 class SMKSubjects {
+  /// Legacy subject list — kept for backward compatibility with old saved data.
   static const List<String> subjects = [
-    'Produktif Kejuruan',
-    'Matematika',
+    'PAD',
+    'PPB',
+    'UI/UX',
+    'Pembuatan Website',
+    'APS',
     'Bahasa Indonesia',
+    'Matematika',
     'Bahasa Inggris',
-    'PPKN',
-    'Sejarah & IPAS',
-    'Pendidikan Agama',
-    'Lainnya',
+    'Sejarah',
+    'PKK',
+    'Olahraga',
+    'BP/BK',
   ];
 
   static Color getSubjectColor(String subject) {
-    switch (subject) {
-      case 'Produktif Kejuruan':
-        return AppColors.subjectProduktif;
-      case 'Matematika':
-        return AppColors.subjectMatematika;
-      case 'Bahasa Indonesia':
-        return AppColors.subjectBahasaIndonesia;
-      case 'Bahasa Inggris':
-        return AppColors.subjectBahasaInggris;
-      case 'PPKN':
-        return AppColors.subjectPkn;
-      case 'Sejarah & IPAS':
-        return AppColors.subjectSejarah;
-      case 'Pendidikan Agama':
-        return AppColors.subjectAgama;
-      default:
-        return AppColors.subjectLainnya;
-    }
+    // Try to find from default subjects first
+    final found =
+        SubjectModel.defaultSubjects.where((s) => s.name == subject).toList();
+    if (found.isNotEmpty) return found.first.color;
+    return AppColors.subjectLainnya;
   }
 
   static IconData getSubjectIcon(String subject) {
-    switch (subject) {
-      case 'Produktif Kejuruan':
-        return Icons.code_rounded;
-      case 'Matematika':
-        return Icons.calculate_rounded;
-      case 'Bahasa Indonesia':
-        return Icons.menu_book_rounded;
-      case 'Bahasa Inggris':
-        return Icons.language_rounded;
-      case 'PPKN':
-        return Icons.account_balance_rounded;
-      case 'Sejarah & IPAS':
-        return Icons.public_rounded;
-      case 'Pendidikan Agama':
-        return Icons.auto_stories_rounded;
-      default:
-        return Icons.assignment_rounded;
-    }
+    return SubjectModel.getIcon(subject);
   }
 }
 
@@ -80,6 +58,7 @@ class TaskModel {
   final String title;
   final String description;
   final String subject;
+  final String category; // SubjectCategory.produktif or SubjectCategory.umum
   final DateTime deadline;
   final TaskPriority priority;
   final bool isCompleted;
@@ -91,6 +70,7 @@ class TaskModel {
     required this.title,
     required this.description,
     required this.subject,
+    this.category = SubjectCategory.produktif,
     required this.deadline,
     required this.priority,
     this.isCompleted = false,
@@ -108,7 +88,7 @@ class TaskModel {
   // Countdown badge string generator
   String get countdownText {
     if (isCompleted) return 'Selesai';
-    
+
     final now = DateTime.now();
     final difference = deadline.difference(now);
 
@@ -148,6 +128,7 @@ class TaskModel {
     String? title,
     String? description,
     String? subject,
+    String? category,
     DateTime? deadline,
     TaskPriority? priority,
     bool? isCompleted,
@@ -159,6 +140,7 @@ class TaskModel {
       title: title ?? this.title,
       description: description ?? this.description,
       subject: subject ?? this.subject,
+      category: category ?? this.category,
       deadline: deadline ?? this.deadline,
       priority: priority ?? this.priority,
       isCompleted: isCompleted ?? this.isCompleted,
@@ -173,6 +155,7 @@ class TaskModel {
       'title': title,
       'description': description,
       'subject': subject,
+      'category': category,
       'deadline': deadline.toIso8601String(),
       'priority': priority.name,
       'isCompleted': isCompleted,
@@ -186,13 +169,17 @@ class TaskModel {
       id: map['id'] as String,
       title: map['title'] as String,
       description: map['description'] as String? ?? '',
-      subject: map['subject'] as String? ?? 'Produktif Kejuruan',
+      subject: map['subject'] as String? ?? 'PAD',
+      category: map['category'] as String? ?? SubjectCategory.produktif,
       deadline: DateTime.parse(map['deadline'] as String),
       priority: TaskPriority.fromString(map['priority'] as String? ?? 'medium'),
       isCompleted: map['isCompleted'] as bool? ?? false,
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : DateTime.now(),
-      completedAt: map['completedAt'] != null ? DateTime.parse(map['completedAt'] as String) : null,
+      createdAt: map['createdAt'] != null
+          ? DateTime.parse(map['createdAt'] as String)
+          : DateTime.now(),
+      completedAt: map['completedAt'] != null
+          ? DateTime.parse(map['completedAt'] as String)
+          : null,
     );
   }
 }
-

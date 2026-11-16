@@ -5,7 +5,6 @@ import '../providers/filter_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/empty_state_view.dart';
-import '../widgets/last_activity_card.dart';
 import '../widgets/productivity_chart.dart';
 import '../widgets/stat_header.dart';
 import '../widgets/subject_filter_bar.dart';
@@ -20,7 +19,18 @@ class HomeScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
     final isDark = themeMode == ThemeMode.dark;
     final tasks = ref.watch(filteredSortedTasksProvider);
-    final selectedFilter = ref.watch(selectedSubjectProvider);
+    final selectedCategory = ref.watch(selectedCategoryProvider);
+    final selectedSubject = ref.watch(selectedSubjectProvider);
+
+    // Build section title based on active filter
+    final String sectionTitle;
+    if (selectedSubject != null) {
+      sectionTitle = 'Tugas $selectedSubject';
+    } else if (selectedCategory != 'Semua') {
+      sectionTitle = 'Tugas ${selectedCategory == 'Produktif Kejuruan' ? 'Produktif' : 'Mapel Umum'}';
+    } else {
+      sectionTitle = 'Daftar Tugas Cerdas';
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -106,15 +116,7 @@ class HomeScreen extends ConsumerWidget {
                 child: StatHeader(),
               ),
 
-              // 2. Kartu Aktivitas Terakhir Pengguna
-              const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 18),
-                  child: LastActivityCard(),
-                ),
-              ),
-
-              // 3. Weekly Productivity Chart
+              // 2. Weekly Productivity Chart
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.only(bottom: 18),
@@ -141,9 +143,7 @@ class HomeScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            selectedFilter == 'Semua'
-                                ? 'Daftar Tugas Cerdas'
-                                : 'Tugas $selectedFilter',
+                            sectionTitle,
                             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -185,7 +185,9 @@ class HomeScreen extends ConsumerWidget {
               // 5. Dynamic Task List or Empty State
               if (tasks.isEmpty)
                 SliverToBoxAdapter(
-                  child: EmptyStateView(currentFilter: selectedFilter),
+                  child: EmptyStateView(
+                    currentFilter: selectedSubject ?? selectedCategory,
+                  ),
                 )
               else
                 SliverList(

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../constants/app_colors.dart';
 import '../models/task_model.dart';
+import '../providers/subject_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/theme_provider.dart';
 
@@ -21,7 +22,17 @@ class TaskCard extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
     final isDark = themeMode == ThemeMode.dark;
 
-    final subjectColor = SMKSubjects.getSubjectColor(task.subject);
+    // Look up subject color from provider (supports custom subjects)
+    final allSubjects = ref.watch(subjectListProvider);
+    final matchedSubject = allSubjects
+        .where((s) => s.name == task.subject)
+        .toList();
+    final subjectColor = matchedSubject.isNotEmpty
+        ? matchedSubject.first.color
+        : SMKSubjects.getSubjectColor(task.subject);
+    final subjectIcon = matchedSubject.isNotEmpty
+        ? matchedSubject.first.icon
+        : SMKSubjects.getSubjectIcon(task.subject);
     final priorityColor = task.priority.color;
     final deadlineFormatted = DateFormat('dd MMM yyyy, HH:mm', 'id_ID').format(task.deadline);
 
@@ -80,7 +91,7 @@ class TaskCard extends ConsumerWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              SMKSubjects.getSubjectIcon(task.subject),
+                              subjectIcon,
                               size: 13,
                               color: subjectColor,
                             ),
