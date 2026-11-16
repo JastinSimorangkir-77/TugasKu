@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../constants/app_colors.dart';
+import '../providers/settings_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/task_provider.dart';
+import '../screens/settings_screen.dart';
 
 class StatHeader extends ConsumerWidget {
   const StatHeader({super.key});
@@ -12,6 +14,7 @@ class StatHeader extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeProvider);
     final stats = ref.watch(taskStatisticsProvider);
+    final settings = ref.watch(settingsProvider);
     final isDark = themeMode == ThemeMode.dark;
 
     final todayFormatted = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(DateTime.now());
@@ -87,11 +90,15 @@ class StatHeader extends ConsumerWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                          'Halo, Siswa SMK',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
+                        Flexible(
+                          child: Text(
+                            'Halo, ${settings.studentName.split(' ').first}',
+                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         const SizedBox(width: 6),
                         const Text('👋', style: TextStyle(fontSize: 16)),
@@ -108,6 +115,40 @@ class StatHeader extends ConsumerWidget {
                   ],
                 ),
               ),
+
+              // Settings Button
+              InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.settings_outlined,
+                    color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    size: 20,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
 
               // Theme Switcher Button
               InkWell(

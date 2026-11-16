@@ -5,6 +5,7 @@ import '../providers/filter_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/theme_provider.dart';
 import '../widgets/empty_state_view.dart';
+import '../widgets/last_activity_card.dart';
 import '../widgets/productivity_chart.dart';
 import '../widgets/stat_header.dart';
 import '../widgets/subject_filter_bar.dart';
@@ -105,7 +106,15 @@ class HomeScreen extends ConsumerWidget {
                 child: StatHeader(),
               ),
 
-              // 2. Weekly Productivity Chart
+              // 2. Kartu Aktivitas Terakhir Pengguna
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 18),
+                  child: LastActivityCard(),
+                ),
+              ),
+
+              // 3. Weekly Productivity Chart
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.only(bottom: 18),

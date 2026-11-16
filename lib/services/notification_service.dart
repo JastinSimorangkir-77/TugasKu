@@ -3,12 +3,18 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import '../models/task_model.dart';
+import 'storage_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
   static bool _isInitialized = false;
+
+  static const String _urgentChannelId = 'tugasku_urgent_channel';
+  static const String _urgentChannelName = 'Peringatan Mendesak (H-2 Jam)';
+  static const String _dailyChannelId = 'tugasku_daily_channel';
+  static const String _dailyChannelName = 'Pengingat Harian Rutin (24 Jam Sekali)';
 
   static Future<void> init() async {
     if (_isInitialized) return;
@@ -74,36 +80,73 @@ class NotificationService {
     }
   }
 
+  /// Jadwal otomatis pintar berbasis preferensi Pengaturan (Settings):
+  /// 1. Jika tenggat masih lama (> 24 jam) dan pengingat harian aktif, jadwalkan pengingat setiap 24 jam sekali.
+  /// 2. Jika tenggat sudah dekat dan peringatan darurat aktif, buat notifikasi peringatan di H-2 jam sebelum tenggat.
   static Future<void> scheduleTaskNotifications(TaskModel task) async {
     if (task.isCompleted) {
       await cancelTaskNotifications(task);
       return;
     }
 
-    final now = DateTime.now();
+    // Bersihkan jadwal lama terlebih dahulu sebelum menjadwalkan ulang
+    await cancelTaskNotifications(task);
 
-    // 1. Jadwalkan 24 Jam Sebelum Deadline
-    final time24hBefore = task.deadline.subtract(const Duration(hours: 24));
-    if (time24hBefore.isAfter(now)) {
+    final now = DateTime.now();
+    final remainingDuration = task.deadline.difference(now);
+
+    // Jangan jadwalkan jika deadline sudah terlewat
+    if (remainingDuration.isNegative) return;
+
+    final settings = StorageService.loadSettings();
+    final time2hBefore = task.deadline.subtract(const Duration(hours: 2));
+
+    // -------------------------------------------------------------------------
+    // 1. Peringatan Mendesak di H-2 Jam Sebelum Tenggat Pengumpulan
+    // -------------------------------------------------------------------------
+    if (settings.enableUrgentReminder && time2hBefore.isAfter(now)) {
       await _scheduleSingleNotification(
-        id: task.notificationId24h,
-        title: 'Pengingat Deadline Tugas Besok (H-1)!',
-        body: '[${task.subject}] "${task.title}" tersisa 24 jam lagi. Yuk selesaikan sekarang!',
-        scheduledDate: time24hBefore,
+        id: task.notificationId2h,
+        title: '⚠️ Mendesak: Deadline 2 Jam Lagi!',
+        body:
+            '[${task.subject}] "${task.title}" harus dikumpulkan dalam 2 jam. Pastikan tugas sudah selesai!',
+        scheduledDate: time2hBefore,
         payload: task.id,
+        isUrgent: true,
+        enableSound: settings.enableSound,
+        enableVibration: settings.enableVibration,
       );
     }
 
-    // 2. Jadwalkan 2 Jam Sebelum Deadline
-    final time2hBefore = task.deadline.subtract(const Duration(hours: 2));
-    if (time2hBefore.isAfter(now)) {
-      await _scheduleSingleNotification(
-        id: task.notificationId2h,
-        title: 'Mendesak: Deadline 2 Jam Lagi!',
-        body: '[${task.subject}] "${task.title}" akan segera berakhir. Pastikan tugas sudah di-submit!',
-        scheduledDate: time2hBefore,
-        payload: task.id,
-      );
+    // -------------------------------------------------------------------------
+    // 2. Pengingat Rutin Harian (Setiap 24 Jam Sekali) Jika Tenggat Masih Lama
+    // -------------------------------------------------------------------------
+    if (settings.enableDailyReminder && remainingDuration.inHours > 24) {
+      final totalDaysAhead = remainingDuration.inDays.clamp(1, 30);
+
+      for (int dayOffset = 1; dayOffset <= totalDaysAhead; dayOffset++) {
+        // Interval setiap 24 jam sekali (1 hari, 2 hari, 3 hari, dst.)
+        final scheduledTime = now.add(Duration(days: dayOffset));
+
+        // Pengingat harian hanya dikirim selama masih sebelum alarm darurat H-2 jam
+        if (scheduledTime.isBefore(time2hBefore)) {
+          final hoursUntilDeadline =
+              task.deadline.difference(scheduledTime).inHours;
+          final daysLeft = (hoursUntilDeadline / 24).ceil();
+
+          await _scheduleSingleNotification(
+            id: task.getDailyNotificationId(dayOffset),
+            title: '📅 Pengingat Harian Tugas: $daysLeft Hari Lagi',
+            body:
+                '[${task.subject}] "${task.title}" tersisa $daysLeft hari lagi. Yuk cicil tugasmu agar tidak menumpuk!',
+            scheduledDate: scheduledTime,
+            payload: task.id,
+            isUrgent: false,
+            enableSound: settings.enableSound,
+            enableVibration: settings.enableVibration,
+          );
+        }
+      }
     }
   }
 
@@ -113,27 +156,34 @@ class NotificationService {
     required String body,
     required DateTime scheduledDate,
     required String payload,
+    required bool isUrgent,
+    required bool enableSound,
+    required bool enableVibration,
   }) async {
     try {
       final tzScheduled = tz.TZDateTime.from(scheduledDate, tz.local);
 
-      const androidDetails = AndroidNotificationDetails(
-        'tugasku_deadline_channel',
-        'Pengingat Deadline TugasKu',
-        channelDescription: 'Notifikasi otomatis 24 jam & 2 jam sebelum batas pengumpulan tugas sekolah.',
-        importance: Importance.max,
-        priority: Priority.high,
+      final androidDetails = AndroidNotificationDetails(
+        isUrgent ? _urgentChannelId : _dailyChannelId,
+        isUrgent ? _urgentChannelName : _dailyChannelName,
+        channelDescription: isUrgent
+            ? 'Notifikasi peringatan darurat tepat 2 jam sebelum batas waktu tugas.'
+            : 'Notifikasi pengingat berkala setiap 24 jam sekali untuk tugas dengan tenggat lama.',
+        importance: isUrgent ? Importance.max : Importance.high,
+        priority: isUrgent ? Priority.max : Priority.high,
         showWhen: true,
+        playSound: enableSound,
+        enableVibration: enableVibration,
         icon: '@mipmap/ic_launcher',
       );
 
-      const iosDetails = DarwinNotificationDetails(
+      final iosDetails = DarwinNotificationDetails(
         presentAlert: true,
         presentBadge: true,
-        presentSound: true,
+        presentSound: enableSound,
       );
 
-      const notificationDetails = NotificationDetails(
+      final notificationDetails = NotificationDetails(
         android: androidDetails,
         iOS: iosDetails,
       );
@@ -149,7 +199,9 @@ class NotificationService {
             UILocalNotificationDateInterpretation.absoluteTime,
         payload: payload,
       );
-      debugPrint('Notification scheduled for $tzScheduled (ID: $id)');
+      debugPrint(
+        'Notification scheduled (${isUrgent ? 'URGENT H-2h' : 'DAILY 24h'}, Sound: $enableSound, Vib: $enableVibration) for $tzScheduled (ID: $id)',
+      );
     } catch (e) {
       debugPrint('Error scheduling notification: $e');
     }
@@ -157,9 +209,14 @@ class NotificationService {
 
   static Future<void> cancelTaskNotifications(TaskModel task) async {
     try {
-      await _notificationsPlugin.cancel(task.notificationId24h);
+      // Batalkan notifikasi mendesak H-2 jam
       await _notificationsPlugin.cancel(task.notificationId2h);
-      debugPrint('Cancelled notifications for task: ${task.id}');
+
+      // Batalkan semua notifikasi pengingat harian 24 jam yang mungkin terjadwal
+      for (int i = 1; i <= 30; i++) {
+        await _notificationsPlugin.cancel(task.getDailyNotificationId(i));
+      }
+      debugPrint('Cancelled all notifications (daily & 2h) for task: ${task.id}');
     } catch (e) {
       debugPrint('Error cancelling notification: $e');
     }
@@ -173,4 +230,3 @@ class NotificationService {
     }
   }
 }
-

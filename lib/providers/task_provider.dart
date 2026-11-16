@@ -1,12 +1,16 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/activity_model.dart';
 import '../models/task_model.dart';
 import '../models/weekly_productivity.dart';
 import '../services/storage_service.dart';
 import '../services/notification_service.dart';
+import 'activity_provider.dart';
 import 'filter_provider.dart';
 
 class TaskNotifier extends StateNotifier<List<TaskModel>> {
-  TaskNotifier() : super([]) {
+  final Ref ref;
+
+  TaskNotifier(this.ref) : super([]) {
     _loadInitialTasks();
   }
 
@@ -26,6 +30,12 @@ class TaskNotifier extends StateNotifier<List<TaskModel>> {
     state = updatedList;
     await StorageService.saveTasks(updatedList);
     await NotificationService.scheduleTaskNotifications(task);
+
+    ref.read(lastActivityProvider.notifier).logActivity(
+      title: 'Menambahkan Tugas Baru',
+      description: '"${task.title}" (${task.subject})',
+      type: ActivityType.created,
+    );
   }
 
   Future<void> updateTask(TaskModel updatedTask) async {
@@ -46,6 +56,12 @@ class TaskNotifier extends StateNotifier<List<TaskModel>> {
     if (!updatedTask.isCompleted && updatedTask.deadline.isAfter(DateTime.now())) {
       await NotificationService.scheduleTaskNotifications(updatedTask);
     }
+
+    ref.read(lastActivityProvider.notifier).logActivity(
+      title: 'Memperbarui Tugas',
+      description: 'Perubahan pada "${updatedTask.title}" disimpan',
+      type: ActivityType.updated,
+    );
   }
 
   Future<void> toggleTaskCompletion(String id) async {
@@ -73,6 +89,14 @@ class TaskNotifier extends StateNotifier<List<TaskModel>> {
         await NotificationService.scheduleTaskNotifications(updatedTask);
       }
     }
+
+    ref.read(lastActivityProvider.notifier).logActivity(
+      title: isNowCompleted ? 'Tugas Selesai! 🎉' : 'Tugas Diaktifkan Kembali',
+      description: isNowCompleted
+          ? 'Tuntas: "${currentTask.title}"'
+          : 'Status dikembalikan ke tertunda: "${currentTask.title}"',
+      type: isNowCompleted ? ActivityType.completed : ActivityType.uncompleted,
+    );
   }
 
   Future<void> deleteTask(String id) async {
@@ -85,23 +109,46 @@ class TaskNotifier extends StateNotifier<List<TaskModel>> {
     final updatedList = state.where((t) => t.id != id).toList();
     state = updatedList;
     await StorageService.saveTasks(updatedList);
+
+    ref.read(lastActivityProvider.notifier).logActivity(
+      title: 'Menghapus Tugas',
+      description: 'Tugas "${taskToDelete.title}" telah dihapus',
+      type: ActivityType.deleted,
+    );
+  }
+
+  Future<void> clearCompletedTasks() async {
+    final activeOnly = state.where((t) => !t.isCompleted).toList();
+    state = activeOnly;
+    await StorageService.saveTasks(activeOnly);
+
+    ref.read(lastActivityProvider.notifier).logActivity(
+      title: 'Membersihkan Tugas Selesai',
+      description: 'Daftar tugas yang telah selesai telah dibersihkan',
+      type: ActivityType.deleted,
+    );
+  }
+
+  Future<void> resetAllTasks() async {
+    state = [];
+    await StorageService.saveTasks([]);
   }
 }
 
 // Global Tasks Provider
 final taskListProvider = StateNotifierProvider<TaskNotifier, List<TaskModel>>((ref) {
-  return TaskNotifier();
+  return TaskNotifier(ref);
 });
 
 // Smart Sorted & Filtered Tasks Provider
 final filteredSortedTasksProvider = Provider<List<TaskModel>>((ref) {
   final tasks = ref.watch(taskListProvider);
-  final selectedSubject = ref.watch(selectedSubjectProvider);
+  final selectedFilter = ref.watch(selectedSubjectProvider);
 
   // 1. Filter by subject
-  final subjectFiltered = selectedSubject == 'Semua'
+  final subjectFiltered = selectedFilter == 'Semua'
       ? tasks
-      : tasks.where((t) => t.subject == selectedSubject).toList();
+      : tasks.where((t) => t.subject == selectedFilter).toList();
 
   // 2. Separate pending and completed tasks
   final pending = subjectFiltered.where((t) => !t.isCompleted).toList();
@@ -200,4 +247,3 @@ final weeklyProductivityProvider = Provider<List<DayProductivity>>((ref) {
 
   return daysList;
 });
-

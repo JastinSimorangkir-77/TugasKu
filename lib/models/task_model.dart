@@ -99,8 +99,11 @@ class TaskModel {
   });
 
   // Unique notification IDs based on task ID hash
-  int get notificationId24h => (id.hashCode.abs() % 10000000) * 2;
-  int get notificationId2h => ((id.hashCode.abs() % 10000000) * 2) + 1;
+  int get notificationId2h => (id.hashCode.abs() % 1000000) * 100;
+
+  // Daily notification IDs for long deadlines (up to 30 days ahead)
+  int getDailyNotificationId(int dayOffset) =>
+      ((id.hashCode.abs() % 1000000) * 100) + (dayOffset % 99) + 1;
 
   // Countdown badge string generator
   String get countdownText {

@@ -30,7 +30,7 @@ class _ProductivityChartState extends ConsumerState<ProductivityChart> {
     }
     final overallRate = totalWeekTasks > 0
         ? ((completedWeekTasks / totalWeekTasks) * 100).toInt()
-        : 100;
+        : 0;
 
     // Determine max Y for chart axis
     double maxY = 4;
@@ -112,7 +112,9 @@ class _ProductivityChartState extends ConsumerState<ProductivityChart> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '$overallRate% Selesai',
+                      totalWeekTasks > 0
+                          ? '$overallRate% Selesai'
+                          : 'Mulai Minggu Ini',
                       style: const TextStyle(
                         color: AppColors.primaryEmerald,
                         fontSize: 11,

@@ -472,7 +472,7 @@ class _TaskFormSheetState extends ConsumerState<TaskFormSheet> {
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Notifikasi otomatis akan dijadwalkan tepat 24 jam & 2 jam sebelum batas waktu.',
+                        'Notifikasi otomatis pintar: Pengingat rutin setiap 24 jam sekali jika tenggat masih lama, dan peringatan darurat di H-2 jam sebelum batas waktu.',
                         style: TextStyle(
                           fontSize: 11,
                           color: AppColors.primaryEmerald,
